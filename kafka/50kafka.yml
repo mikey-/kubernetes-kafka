@@ -16,6 +16,8 @@ spec:
       labels:
         app: kafka
       annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5556"
     spec:
       terminationGracePeriodSeconds: 30
       initContainers:
@@ -41,6 +43,29 @@ spec:
         - name: config
           mountPath: /etc/kafka
       containers:
+      - name: metrics
+        image: solsson/kafka-prometheus-jmx-exporter@sha256:a23062396cd5af1acdf76512632c20ea6be76885dfc20cd9ff40fb23846557e8
+        command:
+        - java
+        - -XX:+UnlockExperimentalVMOptions
+        - -XX:+UseCGroupMemoryLimitForHeap
+        - -XX:MaxRAMFraction=1
+        - -XshowSettings:vm
+        - -jar
+        - jmx_prometheus_httpserver.jar
+        - "5556"
+        - /etc/jmx-kafka/jmx-kafka-prometheus.yml
+        ports:
+        - containerPort: 5556
+        resources:
+          requests:
+            cpu: 0m
+            memory: 60Mi
+          limits:
+            memory: 120Mi
+        volumeMounts:
+        - name: jmx-config
+          mountPath: /etc/jmx-kafka
       - name: broker
         image: solsson/kafka:1.0.1@sha256:1a4689d49d6274ac59b9b740f51b0408e1c90a9b66d16ad114ee9f7193bab111
         env:
@@ -72,6 +97,9 @@ spec:
         - name: data
           mountPath: /var/lib/kafka/data
       volumes:
+      - name: jmx-config
+        configMap:
+          name: jmx-config
       - name: configmap
         configMap:
           name: broker-config
